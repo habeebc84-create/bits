@@ -3,15 +3,22 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { api, strengthColor } from "@/lib/api";
+import { AlertCircle, RotateCcw } from "lucide-react";
 
 export default function History() {
   const [q, setQ] = useState("");
   const [track, setTrack] = useState("");
   const [status, setStatus] = useState("");
   const [data, setData] = useState<{ total: number; items: any[] }>({ total: 0, items: [] });
+  const [err, setErr] = useState("");
 
   async function load() {
-    try { setData(await api.history({ search: q, track, status })); } catch { /* offline */ }
+    setErr("");
+    try {
+      setData(await api.history({ search: q, track, status }));
+    } catch (e: any) {
+      setErr(e.message || "Failed to load research history from server.");
+    }
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
@@ -21,6 +28,19 @@ export default function History() {
       <main className="max-w-[1240px] mx-auto px-6 py-12">
         <h1 className="text-[32px] font-semibold tracking-[-0.02em]">Research history</h1>
         <p className="text-sec text-sm mt-2">Saved investigations reopen without re-running. {data.total} total.</p>
+
+        {err && (
+          <div className="mt-6 border border-neg/40 bg-neg/10 text-neg rounded-md p-4 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0 text-neg" />
+              <span>{err}</span>
+            </div>
+            <button onClick={load} className="border border-neg/40 hover:bg-neg/20 px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 shrink-0">
+              <RotateCcw size={12} /> Retry
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2 mt-6">
           <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()}
             placeholder="Search company or ticker…" className="bg-surf2 border border-line rounded-md px-3 py-2 text-sm w-64 placeholder:text-ter outline-none focus:border-accent" />
@@ -51,7 +71,7 @@ export default function History() {
                   </td>
                 </tr>
               ))}
-              {!data.items.length && <tr><td colSpan={8} className="text-ter text-sm px-3 py-6">No investigations yet. <Link href="/research/new" className="text-accent">Launch one →</Link></td></tr>}
+              {!data.items.length && !err && <tr><td colSpan={8} className="text-ter text-sm px-3 py-6">No investigations yet. <Link href="/research/new" className="text-accent">Launch one →</Link></td></tr>}
             </tbody>
           </table>
         </div>
