@@ -17,18 +17,31 @@ TRACK_FOCUS: dict[str, dict] = {
 }
 
 
-def _series_lookup(series: list[dict], metric: str) -> list[dict]:
+def _series_lookup(series: list[dict], metric: str, years: tuple[int, int] | None = None) -> list[dict]:
     pts = [p for p in series if p["metric"] == metric and p["period"].startswith("FY")]
+    if years:
+        lo, hi = years
+        pts = [p for p in pts if lo <= int(p["period"][2:]) <= hi]
     pts.sort(key=lambda p: p["period"])
     return pts[-6:]  # last 6 fiscal years max
 
 
-def detect_patterns(series: list[dict], track: str) -> list[dict]:
+def _year_window(period_label: str) -> tuple[int, int] | None:
+    """'FY2022-FY2025' -> (2022, 2025). None when unparseable (use full history)."""
+    import re
+    m = re.findall(r"FY\s?(20\d{2})", period_label or "")
+    if len(m) >= 2:
+        return int(m[0]), int(m[-1])
+    return None
+
+
+def detect_patterns(series: list[dict], track: str, period_label: str = "") -> list[dict]:
     """Cross-metric divergence checks. Returns pattern dicts with full calculation trace."""
     focus = TRACK_FOCUS.get(track, TRACK_FOCUS["C"])
     patterns: list[dict] = []
     m1, m2 = focus["m1"], focus["m2"]
-    s1, s2 = _series_lookup(series, m1), _series_lookup(series, m2)
+    years = _year_window(period_label)
+    s1, s2 = _series_lookup(series, m1, years), _series_lookup(series, m2, years)
     per1 = {p["period"]: p["value"] for p in s1}
     per2 = {p["period"]: p["value"] for p in s2}
     common = sorted(set(per1) & set(per2))
@@ -37,18 +50,27 @@ def detect_patterns(series: list[dict], track: str) -> list[dict]:
         v2 = [per2[p] for p in common]
         g1 = F.yoy(v1[-1], v1[0]); g2 = F.yoy(v2[-1], v2[0])
         t1, t2 = F.trend_stats(v1), F.trend_stats(v2)
-        # divergence: series move in opposite directions or growth gap > 15pp
         gap = (g2["value"] - g1["value"]) if (g1["defined"] and g2["defined"]) else float("nan")
-        divergent = (t1["direction"] != t2["direction"] and t1["direction"] != "insufficient" and t2["direction"] != "insufficient") \
-            or (math.isfinite(gap) and abs(gap) > 0.15)
+        opposing = (t1["direction"] != t2["direction"]
+                    and t1["direction"] != "insufficient" and t2["direction"] != "insufficient")
+        # divergence = opposing directions OR a growth-rate gap > 15pp
+        divergent = opposing or (math.isfinite(gap) and abs(gap) > 0.15)
         if divergent:
+            if opposing:
+                reason = (f"{m1} {t1['direction']} while {m2} {t2['direction']} "
+                          f"over {common[0]}–{common[-1]} (growth gap {F.fmt_pct(gap)})")
+            else:
+                # both up, but one grew materially faster
+                faster, slower = (m2, m1) if gap > 0 else (m1, m2)
+                reason = (f"{faster} growth outpaced {slower} by {F.fmt_pct(abs(gap))} "
+                          f"({common[0]}–{common[-1]})")
             patterns.append({
                 "id": "P1", "kind": "divergence",
                 "metric_a": m1, "metric_b": m2, "periods": common,
                 "values_a": v1, "values_b": v2,
                 "growth_a": g1["value"], "growth_b": g2["value"], "gap": gap,
                 "dir_a": t1["direction"], "dir_b": t2["direction"],
-                "reason": f"{m1} {t1['direction']} while {m2} {t2['direction']} over {common[0]}–{common[-1]} (growth gap {F.fmt_pct(gap)})",
+                "reason": reason,
                 "calc": "yoy(end,start) both legs; trend slope sign; |gap|>15pp or opposing slopes",
             })
         # anomalies within each leg
@@ -61,7 +83,7 @@ def detect_patterns(series: list[dict], track: str) -> list[dict]:
     # working-capital divergence
     wc = focus.get("wc")
     if wc:
-        sw = _series_lookup(series, wc)
+        sw = _series_lookup(series, wc, years)
         perw = {p["period"]: p["value"] for p in sw}
         commonw = sorted(set(per1) & set(perw))
         if len(commonw) >= 3:
@@ -75,11 +97,15 @@ def detect_patterns(series: list[dict], track: str) -> list[dict]:
                     "reason": f"{wc} rising ({commonw[0]} {vw[0]:.0f}d → {commonw[-1]} {vw[-1]:.0f}d) while profit holds — cash absorption signal",
                     "calc": "trend slope of wc days > 0 over >=3 FYs",
                 })
-    # margin compression / expansion
-    sm = _series_lookup(series, "opm")
-    if len(sm) >= 3:
-        vals = [p["value"] for p in sm]
-        pers = [p["period"] for p in sm]
+    # margin compression / expansion (needs >=3 DISTINCT periods)
+    sm = _series_lookup(series, "opm", years)
+    pers_all = sorted({p["period"] for p in sm})
+    if len(pers_all) >= 3:
+        per_val = {}
+        for p in sm:
+            per_val.setdefault(p["period"], p["value"])
+        pers = sorted(per_val)
+        vals = [per_val[p] for p in pers]
         # screener OPM is in % points (e.g. 22.5). normalize to fraction for stats
         frac = [v / 100.0 for v in vals]
         t = F.trend_stats(frac)
@@ -153,14 +179,18 @@ def adversarial_review(hyp: dict, patterns: list[dict], n_sources: int, peer_agr
 
 
 def assess_strength(n_independent: int, calc_ok: bool, coverage: dict, counter: dict, limitations: list[str]) -> tuple[str, str]:
-    """Strong requires >=3 independent lines + reproducible calcs + serious counter review.
-    Moderate: >=2 lines + calcs ok. Else Weak. Never inflate."""
+    """Strong requires >=3 independent lines + reproducible calcs + the strongest
+    alternative actually ruled out. An unresolved alternative caps at Moderate.
+    Never inflate."""
     lines = n_independent
-    counter_ok = counter.get("verdict") in ("ruled_out", "unresolved")
-    if lines >= 3 and calc_ok and counter_ok and len(limitations) <= 3:
-        return "Strong", f"{lines} independent evidence lines, deterministic calculations reproduced in finlib-v1, and the strongest alternative ({counter.get('strongest_alternative','')}) was explicitly tested."
+    verdict = counter.get("verdict")
+    alt = counter.get("strongest_alternative", "the strongest alternative")
+    if lines >= 3 and calc_ok and verdict == "ruled_out" and len(limitations) <= 3:
+        return "Strong", f"{lines} independent evidence lines, deterministic calculations reproduced in finlib-v1, and the strongest alternative ({alt}) was explicitly ruled out."
     if lines >= 2 and calc_ok:
-        return "Moderate", f"{lines} independent evidence lines with reproducible calculations; {counter.get('strongest_alternative','alternative explanations')} remain partially open — see counterargument."
+        cap = "Moderate"
+        return cap, (f"{lines} independent evidence lines with reproducible calculations, but the strongest "
+                     f"alternative ({alt}) remains {verdict or 'unresolved'} — treat as a corroborated lead, not a closed conclusion.")
     return "Weak", "Limited independent evidence or unresolved alternatives; treat as a lead for further verification, not a conclusion."
 
 

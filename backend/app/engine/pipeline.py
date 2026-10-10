@@ -207,7 +207,7 @@ async def _run(inv_id: str):
 
         # ---- patterns ----
         _emit(db, inv, "patterns", "Running deterministic pattern + anomaly scans…")
-        patterns = A.detect_patterns(series, inv.track)
+        patterns = A.detect_patterns(series, inv.track, inv.period)
         inv.error = json.dumps({"plan": plan, "patterns": patterns})
         db.commit()
         if patterns:
@@ -346,18 +346,27 @@ def _compose(db, inv, meta, series, patterns, hyps, counter, strength, rationale
         key_numbers, timeline, significance = [], [{"date": now_iso()[:10], "label": "No pattern above threshold — inconclusive", "kind": "assessment"}], \
             ["Inconclusive runs are first-class results: they prevent false discoveries.", "Re-run at deeper depth or after fresh filings for more coverage."]
     else:
-        p0 = patterns[0]
+        # lead with a divergence pattern when one exists; otherwise report the
+        # strongest observed pattern honestly (never an empty "X vs Y" headline)
+        div = next((p for p in patterns if p["kind"] == "divergence"), patterns[0])
+        p0 = div
         per = p0.get("periods", [])
         a, b = p0.get("metric_a", ""), p0.get("metric_b", "")
         gap = p0.get("gap", float("nan"))
-        headline = f"{inv.ticker}: {a} vs {b} diverged {F.fmt_pct(gap)} over {per[0]}–{per[-1]}" if per else f"{inv.ticker}: {p0['reason'][:100]}"
+        if p0["kind"] == "divergence" and per:
+            headline = f"{inv.ticker}: {p0['reason']}"
+        else:
+            headline = f"{inv.ticker}: {p0['reason'][:160]}"
         finding = hyps[0]["text"] + f" Calculation trace: {p0.get('calc','')}. Peer check across {[p['ticker'] for p in peers]}: {'peers move the same way (sector effect possible)' if peer_agrees else 'peers do not mirror the move (idiosyncratic)'}."
         key_numbers = []
-        for m in (a, b):
-            leg = [x for x in series if x["metric"] == m][-3:]
-            for x in leg:
-                key_numbers.append({"metric": f"{m} ({x['period']})", "value": x["value"], "units": x["units"],
-                                    "periods": x["period"], "formula": f"reported ({x['table']})",
+        legs = [(a, p0.get("values_a", [])), (b, p0.get("values_b", []))]
+        for mname, vals in legs:
+            for per_i, val in zip(per, vals):
+                meta = next((x for x in series if x["metric"] == mname and x["period"] == per_i), None)
+                if meta is None:
+                    continue
+                key_numbers.append({"metric": f"{mname} ({per_i})", "value": val, "units": meta["units"],
+                                    "periods": per_i, "formula": f"reported ({meta['table']})",
                                     "source_ids": [fin_src.id] if fin_src else []})
         if math.isfinite(gap or float("nan")):
             key_numbers.append({"metric": f"growth gap {b or ''} minus {a or ''}", "value": round(float(gap) * 100, 1),
