@@ -4,8 +4,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import HTMLResponse
-from sse_starlette.sse import EventSourceResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 
 from ..db import SessionLocal
 from ..engine import jobs
@@ -124,13 +123,13 @@ async def research_events(rid: str):
         try:
             inv = db.get(Investigation, rid)
             if not inv:
-                yield {"event": "error", "data": json.dumps({"message": "not found"})}
+                yield 'event: error\ndata: {"message": "not found"}\n\n'
                 return
             try:
                 seen = len(json.loads(inv.events or "[]"))
             except Exception:
                 seen = 0
-            yield {"event": "stage", "data": json.dumps({"stage": inv.stage, "status": inv.status})}
+            yield f"event: stage\ndata: {json.dumps({'stage': inv.stage, 'status': inv.status})}\n\n"
             for _ in range(600):  # ~20 min max stream
                 await asyncio.sleep(2)
                 db.expire_all()
@@ -142,15 +141,16 @@ async def research_events(rid: str):
                 except Exception:
                     evts = []
                 for e in evts[seen:]:
-                    yield {"event": "event", "data": json.dumps(e)}
+                    yield f"event: event\ndata: {json.dumps(e)}\n\n"
                 seen = len(evts)
                 if inv.status in ("completed", "failed", "cancelled"):
-                    yield {"event": "done", "data": json.dumps({"status": inv.status, "discovery_id": inv.discovery_id})}
+                    yield f"event: done\ndata: {json.dumps({'status': inv.status, 'discovery_id': inv.discovery_id})}\n\n"
                     break
         finally:
             db.close()
 
-    return EventSourceResponse(gen())
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/research/{rid}/cancel")

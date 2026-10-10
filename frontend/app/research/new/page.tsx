@@ -84,7 +84,7 @@ export default function NewInvestigation() {
               </div>
               <div>
                 <div className="label mb-2">Sector track</div>
-                <select value={track} onChange={(e) => setTrack(e)} className="w-full bg-surf2 border border-line rounded-md px-3 py-2.5 text-sm">
+                <select value={track} onChange={(e) => setTrack(e.target.value)} className="w-full bg-surf2 border border-line rounded-md px-3 py-2.5 text-sm">
                   {Object.entries(TRACKS).map(([k, v]) => <option key={k} value={k}>Track {k} — {v}</option>)}
                 </select>
               </div>

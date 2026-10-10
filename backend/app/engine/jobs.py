@@ -22,16 +22,33 @@ def _loop_get() -> asyncio.AbstractEventLoop:
     return _loop
 
 
-def submit(investigation_id: str, coro_factory) -> str:
+def submit(investigation_id: str, fn) -> str:
+    """fn is a sync callable (pipeline entrypoint). Runs in a worker thread."""
     loop = _loop_get()
-    fut = asyncio.run_coroutine_threadsafe(_guard(investigation_id, coro_factory()), loop)
+    fut = asyncio.run_coroutine_threadsafe(_guard(investigation_id, fn), loop)
     _tasks[investigation_id] = fut  # type: ignore
     return investigation_id
 
 
-async def _guard(investigation_id: str, coro):
+async def _guard(investigation_id: str, fn):
     try:
-        return await coro
+        await asyncio.to_thread(fn)
+    except asyncio.CancelledError:
+        from ..db import SessionLocal
+        from ..models import Investigation
+        from .pipeline import _emit
+
+        db = SessionLocal()
+        try:
+            inv = db.get(Investigation, investigation_id)
+            if inv and inv.status == "running":
+                inv.status = "cancelled"
+                inv.stage = "cancelled"
+                db.commit()
+                _emit(db, inv, "cancelled", "Investigation cancelled by user.", kind="warn")
+        finally:
+            db.close()
+        raise
     except asyncio.CancelledError:
         from ..db import SessionLocal
         from ..models import Investigation

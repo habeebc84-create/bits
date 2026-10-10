@@ -92,7 +92,7 @@ export default function ResearchWorkspace() {
                     ))}
                   </ul>}
                 {!!data.patterns?.length && (
-                  <><div className="label mt-5 mb-3">Validated patterns (deterministic)</div>
+                  <div><div className="label mt-5 mb-3">Validated patterns (deterministic)</div>
                     <ul className="space-y-2">
                       {data.patterns.map((p: any, i: number) => (
                         <li key={i} className="text-[13px] border border-pos/30 bg-pos/5 rounded-md p-3">
@@ -100,7 +100,7 @@ export default function ResearchWorkspace() {
                           <div className="text-[11px] text-ter mt-1">calc: {p.calc}</div>
                         </li>
                       ))}
-                    </ul></>}
+                    </ul></div>)}
               </div>
               <div className="card p-5">
                 <div className="label mb-3">Live evidence stream</div>

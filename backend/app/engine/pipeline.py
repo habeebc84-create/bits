@@ -39,6 +39,10 @@ STAGES = ["resolve", "plan", "discover", "extract", "financials", "patterns",
 
 
 def _emit(db, inv: Investigation, stage: str, message: str, kind: str = "info"):
+    db.expire_all()
+    db.refresh(inv)
+    if inv.status == "cancelled" and stage != "cancelled":
+        raise asyncio.CancelledError(f"job {inv.id} cancelled")
     try:
         evts = json.loads(inv.events or "[]")
     except Exception:

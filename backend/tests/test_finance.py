@@ -36,10 +36,10 @@ def test_yoy_margin_cagr_missing():
 
 
 def test_anomaly_and_trend():
-    vals = [100, 102, 101, 103, 250, 104]
-    pers = [f"FY{2019 + i}" for i in range(6)]
+    vals = [100, 101, 100, 102, 101, 102, 250, 103]
+    pers = [f"FY{2019 + i}" for i in range(8)]
     flags = F.anomaly_flags(vals, pers)
-    assert any(f["period"] == "FY2023" for f in flags)
+    assert any(f["period"] == "FY2025" for f in flags)
     t = F.trend_stats([10, 20, 30])
     assert t["direction"] == "up"
     assert F.trend_stats([5])["direction"] == "insufficient"
