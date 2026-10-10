@@ -46,7 +46,9 @@ export default function DiscoveryPage() {
   if (!d) return <div><Nav /><main className="max-w-[1240px] mx-auto px-6 py-12 space-y-3">{[1,2,3,4].map((i)=><div key={i} className="skel h-40"/>)}</main></div>;
 
   const srcById: Record<string, any> = Object.fromEntries((ev?.sources ?? []).map((s: any) => [s.id, s]));
-  const toc = [["overview","A · Overview"],["why","B · Why it matters"],["numbers","C · Key numbers"],["charts","D · Charts"],["timeline","E · Timeline"],["evidence","F · Evidence trail"],["counter","G · Counterargument"],["falsify","H · Falsification"],["strength","I · Evidence strength"],["sources","J · Sources & methodology"]];
+  const toc: [string, string][] = [["overview","A · Overview"],["why","B · Why it matters"],["numbers","C · Key numbers"]];
+  if (charts.length) toc.push(["charts","D · Charts"]);
+  toc.push(["timeline","E · Timeline"],["evidence","F · Evidence trail"],["counter","G · Counterargument"],["falsify","H · Falsification"],["strength","I · Evidence strength"],["sources","J · Sources & methodology"]);
 
   return (
     <div>
