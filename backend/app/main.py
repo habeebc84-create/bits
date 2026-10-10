@@ -15,10 +15,13 @@ init_db()
 
 app = FastAPI(title="SIGNAL HUNTER X", version="1.0.0",
               description="Autonomous Financial Intelligence & Hidden Signal Discovery")
+# Dev: the app is often opened via localhost OR a LAN IP, and the backend never
+# uses credentials/cookies — so permit any origin. Prod: pin to FRONTEND_ORIGIN.
+_app_origins = ["*"] if not settings.is_prod else [settings.FRONTEND_ORIGIN]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=_app_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

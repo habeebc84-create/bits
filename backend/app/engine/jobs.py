@@ -49,22 +49,6 @@ async def _guard(investigation_id: str, fn):
         finally:
             db.close()
         raise
-    except asyncio.CancelledError:
-        from ..db import SessionLocal
-        from ..models import Investigation
-        from .pipeline import _emit
-
-        db = SessionLocal()
-        try:
-            inv = db.get(Investigation, investigation_id)
-            if inv and inv.status == "running":
-                inv.status = "cancelled"
-                inv.stage = "cancelled"
-                db.commit()
-                _emit(db, inv, "cancelled", "Investigation cancelled by user.", kind="warn")
-        finally:
-            db.close()
-        raise
     except Exception as e:  # pragma: no cover
         log.exception("job %s failed", investigation_id)
         from ..db import SessionLocal
@@ -85,8 +69,8 @@ async def _guard(investigation_id: str, fn):
 
 
 def cancel(investigation_id: str) -> bool:
-    fut = _tasks.get(investigation_id)
-    if fut and not fut.done():
-        fut.cancel()
+    task = _tasks.get(investigation_id)
+    if task and not task.done():
+        task.cancel()
         return True
     return False

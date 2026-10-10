@@ -6,6 +6,8 @@ dist
 *.db
 *.db-journal
 backend/.env
+backend/test_shx.db
+backend/signalhunter.db
 __pycache__/
 .pytest_cache/
 next-env.d.ts

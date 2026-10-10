@@ -50,7 +50,7 @@ COMPANIES: list[dict] = [
 
 
 def _norm(s: str) -> str:
-    return "".join(c.lower() if c.isalnum() else " " for c in s).split().__str__()
+    return " ".join("".join(c.lower() if c.isalnum() else " " for c in s).split())
 
 
 def search_companies(query: str, limit: int = 8) -> list[dict]:
@@ -70,7 +70,7 @@ def search_companies(query: str, limit: int = 8) -> list[dict]:
             score += 60
         overlap = len(qtok & set(name.replace(".", " ").split()))
         score += overlap * 12
-        if c["ticker"].lower().startswith(q.upper()[:3]) and len(q) >= 2:
+        if c["ticker"].upper().startswith(q.upper()[:3]) and len(q) >= 2:
             score += 5
         if score > 0:
             scored.append((score, c))
@@ -90,8 +90,12 @@ def resolve_company(query: str, exchange: str = "NSE") -> dict | None:
     if len(hits) == 1:
         return {**hits[0], "exchange": exchange or hits[0]["exchange"]}
     if len(hits) >= 2:
-        # unambiguous only if top hit contains full query and second is clearly worse
-        return {**hits[0], "exchange": exchange or hits[0]["exchange"]}
+        # unambiguous only if top hit contains the full query and second is clearly worse
+        top, second = hits[0], hits[1]
+        tq = q.lower()
+        if tq in top["canonical_name"].lower() or tq in top["ticker"].lower():
+            return {**top, "exchange": exchange or top["exchange"]}
+        return None
     return None
 
 

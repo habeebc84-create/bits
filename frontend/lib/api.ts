@@ -1,4 +1,15 @@
-export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+/**
+ * Resolve the API base from the page the browser actually loaded.
+ * Lets you open the app via localhost, LAN IP, or a deployed host without
+ * breaking calls to the backend. NEXT_PUBLIC_API_URL always wins when set.
+ */
+function apiBase(): string {
+  if (typeof window === "undefined") return "http://localhost:8000"; // SSR on the dev host
+  const { protocol, hostname } = window.location;
+  return `${protocol}//${hostname}:8000`;
+}
+
+export const API = process.env.NEXT_PUBLIC_API_URL ?? apiBase();
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {

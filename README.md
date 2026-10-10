@@ -18,12 +18,17 @@ Prerequisites: Python 3.11+, Node 20+.
 cd backend
 cp .env.example .env
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000        # → http://localhost:8000/api/health
+# --host 0.0.0.0 lets the frontend reach the API when opened via LAN IP,
+# and CORS is wide-open in development (no credentials are ever sent).
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000   # → http://localhost:8000/api/health
 
 # Frontend (new terminal)
 cd frontend
 npm install
 npm run dev                                       # → http://localhost:3000
+
+# The frontend auto-derives the API host from the address you load it at
+# (localhost or LAN IP); set NEXT_PUBLIC_API_URL to override.
 ```
 
 Optional upgrades via `backend/.env` (all graceful — system works without them):

@@ -181,15 +181,14 @@ def adversarial_review(hyp: dict, patterns: list[dict], n_sources: int, peer_agr
 def assess_strength(n_independent: int, calc_ok: bool, coverage: dict, counter: dict, limitations: list[str]) -> tuple[str, str]:
     """Strong requires >=3 independent lines + reproducible calcs + the strongest
     alternative actually ruled out. An unresolved alternative caps at Moderate.
-    Never inflate."""
+    Never inflates."""
     lines = n_independent
     verdict = counter.get("verdict")
     alt = counter.get("strongest_alternative", "the strongest alternative")
     if lines >= 3 and calc_ok and verdict == "ruled_out" and len(limitations) <= 3:
         return "Strong", f"{lines} independent evidence lines, deterministic calculations reproduced in finlib-v1, and the strongest alternative ({alt}) was explicitly ruled out."
     if lines >= 2 and calc_ok:
-        cap = "Moderate"
-        return cap, (f"{lines} independent evidence lines with reproducible calculations, but the strongest "
+        return "Moderate", (f"{lines} independent evidence lines with reproducible calculations, but the strongest "
                      f"alternative ({alt}) remains {verdict or 'unresolved'} — treat as a corroborated lead, not a closed conclusion.")
     return "Weak", "Limited independent evidence or unresolved alternatives; treat as a lead for further verification, not a conclusion."
 

@@ -40,7 +40,7 @@ def build_plan(company: dict, evidence_surface: dict) -> list[dict]:
         ev_score = 2 if avail >= 2 else (1 if avail == 1 else 0)
         src_score = min(2, n_sources // 3)
         novelty, materiality, testability = 2, 2, 2  # cross-metric questions are inherently non-dashboard
-        total = novelty + materiality + ev_score + testability
+        total = min(9, novelty + materiality + ev_score + testability)
         plan.append({
             "id": f"Q{i+1}", "question": t["q"], "hypothesis": t["q"],
             "why": t["why"], "metrics": t["metrics"],
