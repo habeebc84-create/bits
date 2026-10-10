@@ -5,11 +5,15 @@
  */
 function apiBase(): string {
   if (typeof window === "undefined") return "http://localhost:8000"; // SSR on the dev host
+  const env = process.env.NEXT_PUBLIC_API_URL;
+  if (env) return env.replace(/\/$/, "");
   const { protocol, hostname } = window.location;
-  return `${protocol}//${hostname}:8000`;
+  // Same-origin: backend may be served by the same host (Netlify Function or proxy)
+  if (hostname === "localhost" || hostname === "127.0.0.1") return "http://localhost:8000";
+  return `${protocol}//${hostname}`;
 }
 
-export const API = process.env.NEXT_PUBLIC_API_URL ?? apiBase();
+export const API = apiBase();
 
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {
