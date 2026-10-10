@@ -48,6 +48,9 @@ Demo fixture (clearly labeled fictional layout demo, never live research):
 cd backend && python -m app.seed_demo
 ```
 
+Handy `make` targets: `make backend`, `make frontend`, `make test`, `make seed`.
+More: **[docs/SOLUTION_REPORT.md](docs/SOLUTION_REPORT.md)** (Round 1) and **[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)** (2-min & 10-min demos).
+
 ## 2. How it works
 
 Eleven persisted stages, executed in order by `backend/app/engine/pipeline.py`:
