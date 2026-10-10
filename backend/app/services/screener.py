@@ -134,7 +134,7 @@ def to_annual_series(tables: dict, ticker: str, url: str) -> list[dict]:
             if (metric, period, scope) in seen:
                 continue
             seen.add((metric, period, scope))
-            units = "%" if metric in ("roe", "roce", "opm") else ("days" if "days" in metric or "cycle" in metric else ("INR" if metric == "eps" else "INR-cr"))
+            units = "%" if metric in ("roe", "roce", "opm") else ("days" if ("days" in metric or "cycle" in metric or "conversion" in metric) else ("INR" if metric == "eps" else "INR-cr"))
             series.append({"metric": metric, "period": period, "value": float(val), "units": units,
                            "scope": scope, "url": url, "table": t["label"]})
     return series
