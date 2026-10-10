@@ -1,0 +1,21 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { background: #080D18; color: #F1F5F9; font-feature-settings: "tnum" 1, "cv11" 1; }
+* { transition-duration: 150ms; }
+::selection { background: rgba(62, 201, 214, 0.25); }
+.card { @apply bg-surf1 border border-line rounded-lg; }
+.label { @apply text-[12px] font-medium uppercase tracking-wider text-sec; }
+.num { font-variant-numeric: tabular-nums; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid #3EC9D6; outline-offset: 2px;
+}
+.skel { @apply animate-pulse bg-surf2 rounded; }
+table.fin { @apply w-full text-sm; }
+table.fin th { @apply text-left label font-medium py-2 px-3 border-b border-line; }
+table.fin td { @apply py-2 px-3 border-b border-line/60; }
+table.fin td.n, table.fin th.n { @apply text-right num; }
+table.fin tbody tr:hover { background: rgba(62,201,214,0.04); }
