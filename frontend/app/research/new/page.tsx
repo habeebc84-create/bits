@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { api, TRACKS, type CompanyHit } from "@/lib/api";
-import { Search, Building2 } from "lucide-react";
+import { Search, Building2, AlertCircle } from "lucide-react";
 
 export default function NewInvestigation() {
   const r = useRouter();
@@ -22,7 +22,12 @@ export default function NewInvestigation() {
     clearTimeout(t.current);
     if (q.trim().length < 2) { setHits([]); return; }
     t.current = setTimeout(async () => {
-      try { setHits((await api.searchCompanies(q)).results); } catch { /* offline */ }
+      try {
+        const res = await api.searchCompanies(q);
+        setHits(res.results);
+      } catch {
+        /* offline or search fail */
+      }
     }, 250);
     return () => clearTimeout(t.current);
   }, [q]);
@@ -33,7 +38,10 @@ export default function NewInvestigation() {
     try {
       const { id } = await api.createResearch({ company: sel.ticker, exchange, track, period, depth });
       r.push(`/research/${id}`);
-    } catch (e: any) { setErr(e.message); setBusy(false); }
+    } catch (e: any) {
+      setErr(e.message || "Failed to launch research job. Please verify backend service.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -49,18 +57,35 @@ export default function NewInvestigation() {
               <div className="label mb-2">Company name or ticker</div>
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-3 text-ter" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. ITC, HDFCBANK, Sun Pharma…"
-                  className="w-full bg-surf2 border border-line rounded-md pl-9 pr-3 py-2.5 text-sm placeholder:text-ter focus:border-accent outline-none" />
+                <input
+                  value={q}
+                  onChange={(e) => {
+                    setQ(e.target.value);
+                    if (err) setErr("");
+                  }}
+                  placeholder="e.g. ITC, HDFCBANK, Sun Pharma…"
+                  className="w-full bg-surf2 border border-line rounded-md pl-9 pr-3 py-2.5 text-sm placeholder:text-ter focus:border-accent outline-none"
+                />
               </div>
               {!!hits.length && (
                 <ul className="mt-2 border border-line rounded-md divide-y divide-line/60 bg-surf2 max-h-64 overflow-auto">
                   {hits.map((h) => (
                     <li key={h.ticker}>
-                      <button onClick={() => { setSel(h); setTrack(h.track); setQ(`${h.canonical_name} (${h.ticker})`); setHits([]); }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-accent/5 flex items-center gap-3">
+                      <button
+                        onClick={() => {
+                          setSel(h);
+                          setTrack(h.track);
+                          setQ(`${h.canonical_name} (${h.ticker})`);
+                          setHits([]);
+                          if (err) setErr("");
+                        }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-accent/5 flex items-center gap-3"
+                      >
                         <Building2 size={15} className="text-ter shrink-0" />
-                        <span><span className="text-sm font-medium">{h.canonical_name}</span>
-                          <span className="text-[12px] text-ter ml-2 num">{h.ticker} · {h.sector} · Track {h.track}</span></span>
+                        <span>
+                          <span className="text-sm font-medium">{h.canonical_name}</span>
+                          <span className="text-[12px] text-ter ml-2 num">{h.ticker} · {h.sector} · Track {h.track}</span>
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -97,8 +122,19 @@ export default function NewInvestigation() {
                 </div>
               </div>
             </div>
-            {err && <div className="text-sm text-neg border border-neg/40 bg-neg/10 rounded-md px-4 py-2.5">{err}</div>}
-            <button onClick={start} disabled={busy || !sel} className="bg-accent text-ink font-semibold text-sm px-6 py-2.5 rounded-md hover:brightness-110 disabled:opacity-40">
+
+            {err && (
+              <div className="text-sm text-neg border border-neg/40 bg-neg/10 rounded-md px-4 py-3 flex items-center gap-2.5">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{err}</span>
+              </div>
+            )}
+
+            <button
+              onClick={start}
+              disabled={busy || !sel}
+              className="bg-accent text-ink font-semibold text-sm px-6 py-2.5 rounded-md hover:brightness-110 disabled:opacity-40"
+            >
               {busy ? "Launching…" : "Start research"}
             </button>
           </div>

@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import { MetricChart } from "@/components/charts";
 import { api, strengthColor } from "@/lib/api";
-import { ExternalLink, Printer, ChevronDown, FlaskConical } from "lucide-react";
+import { ExternalLink, Printer, ChevronDown, FlaskConical, AlertCircle, RotateCcw } from "lucide-react";
 
 function Section({ id, n, title, children }: { id: string; n: string; title: string; children: React.ReactNode }) {
   return (
@@ -25,9 +25,14 @@ export default function DiscoveryPage() {
   const [err, setErr] = useState("");
   const [openSrc, setOpenSrc] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.discovery(id).then(setD).catch((e) => setErr(e.message));
+  function load() {
+    setErr("");
+    api.discovery(id).then(setD).catch((e) => setErr(e.message || "Failed to load discovery details."));
     api.evidence(id).then(setEv).catch(() => {});
+  }
+
+  useEffect(() => {
+    load();
   }, [id]);
 
   const charts = useMemo(() => {
@@ -42,7 +47,24 @@ export default function DiscoveryPage() {
     return Object.entries(groups).map(([m, data]) => ({ metric: m, data }));
   }, [d]);
 
-  if (err) return <div><Nav /><main className="max-w-[1240px] mx-auto px-6 py-16 text-neg text-sm">{err}</main></div>;
+  if (err) return (
+    <div>
+      <Nav />
+      <main className="max-w-[1240px] mx-auto px-6 py-16">
+        <div className="card p-6 border-neg/40 bg-neg/10 max-w-xl mx-auto text-center space-y-4">
+          <AlertCircle size={32} className="text-neg mx-auto" />
+          <div>
+            <h2 className="text-lg font-semibold text-neg">Unable to load report</h2>
+            <p className="text-sm text-sec mt-1">{err}</p>
+          </div>
+          <button onClick={load} className="border border-neg/40 hover:bg-neg/20 px-4 py-2 rounded-md text-sm font-medium inline-flex items-center gap-2 text-neg">
+            <RotateCcw size={15} /> Try again
+          </button>
+        </div>
+      </main>
+    </div>
+  );
+
   if (!d) return <div><Nav /><main className="max-w-[1240px] mx-auto px-6 py-12 space-y-3">{[1,2,3,4].map((i)=><div key={i} className="skel h-40"/>)}</main></div>;
 
   const srcById: Record<string, any> = Object.fromEntries((ev?.sources ?? []).map((s: any) => [s.id, s]));

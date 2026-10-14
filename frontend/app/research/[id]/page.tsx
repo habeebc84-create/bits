@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { StageBar } from "@/components/charts";
 import { api } from "@/lib/api";
-import { ExternalLink, Ban, RotateCcw } from "lucide-react";
+import { ExternalLink, Ban, RotateCcw, AlertCircle } from "lucide-react";
 
 type Evt = { ts: string; stage: string; message: string; kind: string };
 
@@ -19,12 +19,16 @@ export default function ResearchWorkspace() {
     try {
       const d = await api.research(id);
       setData(d);
+      setErr("");
       if (d.status === "completed" && d.discovery_id) {
         es.current?.close();
         r.replace(`/discoveries/${d.discovery_id}`);
       }
       return d.status;
-    } catch (e: any) { setErr(e.message); return "error"; }
+    } catch (e: any) {
+      setErr(e.message || "Failed to fetch investigation updates.");
+      return "error";
+    }
   }
 
   useEffect(() => {
@@ -37,18 +41,32 @@ export default function ResearchWorkspace() {
       const src = new EventSource(api.eventsUrl(id));
       es.current = src;
       src.addEventListener("done", () => { poll(); src.close(); clearInterval(t); });
+      src.onerror = () => {
+        // EventSource reconnection error handling
+      };
     } catch { /* polling fallback covers it */ }
     return () => { clearInterval(t); es.current?.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const events: Evt[] = data?.events ?? [];
-  const srcs: any[] = [];
 
   return (
     <div>
       <Nav active="/research/new" />
       <main className="max-w-[1240px] mx-auto px-6 py-10">
+        {err && (
+          <div className="mb-6 border border-neg/40 bg-neg/10 text-neg rounded-md p-4 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={16} className="shrink-0 text-neg" />
+              <span>{err}</span>
+            </div>
+            <button onClick={() => poll()} className="border border-neg/40 hover:bg-neg/20 px-3 py-1 rounded text-xs font-medium shrink-0">
+              Retry Connection
+            </button>
+          </div>
+        )}
+
         {!data ? (
           <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="skel h-16" />)}</div>
         ) : (
@@ -75,7 +93,15 @@ export default function ResearchWorkspace() {
                 {data.status === "running" && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
               </div>
               <StageBar stages={data.stages} index={data.stage_index} status={data.status} />
-              {data.error && <div className="text-sm text-neg mt-3">{data.error}</div>}
+              {data.error && (
+                <div className="text-sm border border-neg/40 bg-neg/10 text-neg rounded-md p-3.5 mt-4 flex items-start gap-2.5">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold mb-0.5">Pipeline execution failed</div>
+                    <div>{data.error}</div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid lg:grid-cols-2 gap-6 mt-6">
@@ -118,7 +144,6 @@ export default function ResearchWorkspace() {
             </div>
           </>
         )}
-        {err && <div className="text-sm text-neg mt-4">{err}</div>}
       </main>
     </div>
   );
